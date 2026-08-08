@@ -1,8 +1,8 @@
 ```javascript
 /**
- * LLM Chat App Frontend
+ * NovaIV2 Chat App Frontend
  *
- * Handles the chat UI interactions and communication with the backend API.
+ * Handles chat UI interactions and communication with the backend API.
  */
 
 // DOM elements
@@ -15,117 +15,80 @@ const typingIndicator = document.getElementById("typing-indicator");
 let chatHistory = [
 	{
 		role: "assistant",
-		content:
-			"Hello! I'm NovaIV2. How can I help you today?",
+		content: "Hello! I'm NovaIV2. How can I help you today?",
 	},
 ];
 
 let isProcessing = false;
 
-// Auto-resize textarea as user types
-userInput.addEventListener("input", function () {
-	this.style.height = "auto";
-	this.style.height = this.scrollHeight + "px";
-});
-
-// Send message on Enter (without Shift)
-userInput.addEventListener("keydown", function (e) {
-	if (e.key === "Enter" && !e.shiftKey) {
-		e.preventDefault();
-		sendMessage();
-	}
-});
-
-// Send button click handler
-sendButton.addEventListener("click", sendMessage);
-
 /**
- * Escapes HTML so AI responses cannot inject HTML into the page.
+ * Escape HTML to prevent the AI response from inserting actual HTML.
  */
 function escapeHtml(text) {
-	const div = document.createElement("div");
-	div.textContent = text;
-	return div.innerHTML;
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#039;");
 }
 
 /**
- * Converts basic Markdown into safe HTML.
+ * Convert basic Markdown to HTML.
  *
- * Supported:
+ * Supports:
  * **bold**
  * *italic*
  * `code`
- * [links](https://example.com)
- * bullet points
- * numbered lists
- * headings
  */
 function markdownToHtml(text) {
 	let html = escapeHtml(text);
 
-	// Code
-	html = html.replace(
-		/`([^`\n]+)`/g,
-		"<code>$1</code>"
-	);
-
-	// Bold
+	// Bold: **text**
 	html = html.replace(
 		/\*\*(.+?)\*\*/g,
 		"<strong>$1</strong>"
 	);
 
-	// Italic
+	// Italic: *text*
 	html = html.replace(
 		/(?<!\*)\*([^*\n]+)\*(?!\*)/g,
 		"<em>$1</em>"
 	);
 
-	// Headings
+	// Inline code: `code`
 	html = html.replace(
-		/^### (.+)$/gm,
-		"<h3>$1</h3>"
+		/`([^`\n]+)`/g,
+		"<code>$1</code>"
 	);
 
-	html = html.replace(
-		/^## (.+)$/gm,
-		"<h2>$1</h2>"
-	);
-
-	html = html.replace(
-		/^# (.+)$/gm,
-		"<h1>$1</h1>"
-	);
-
-	// Links
-	html = html.replace(
-		/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-		'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-	);
-
-	// Bullet points
-	html = html.replace(
-		/^[ \t]*[-*] (.+)$/gm,
-		"<li>$1</li>"
-	);
-
-	// Numbered lists
-	html = html.replace(
-		/^[ \t]*\d+\. (.+)$/gm,
-		"<li>$1</li>"
-	);
-
-	// Group consecutive list items
-	html = html.replace(
-		/(?:<li>.*?<\/li>\n?)+/gs,
-		"<ul>$&</ul>"
-	);
-
-	// Line breaks
+	// Preserve line breaks
 	html = html.replace(/\n/g, "<br>");
 
 	return html;
 }
+
+// Auto-resize textarea
+userInput.addEventListener("input", function () {
+	this.style.height = "auto";
+	this.style.height = this.scrollHeight + "px";
+});
+
+// Send message with Enter
+userInput.addEventListener("keydown", function (e) {
+	if (e.key === "Enter" && !e.shiftKey) {
+		e.preventDefault();
+
+		if (!isProcessing) {
+			sendMessage();
+		}
+	}
+});
+
+// Send button
+sendButton.addEventListener("click", function () {
+	sendMessage();
+});
 
 /**
  * Sends a message to the chat API and processes the response.
@@ -133,15 +96,16 @@ function markdownToHtml(text) {
 async function sendMessage() {
 	const message = userInput.value.trim();
 
-	// Don't send empty messages
-	if (message === "" || isProcessing) return;
+	if (message === "" || isProcessing) {
+		return;
+	}
 
-	// Disable input while processing
+	// Disable input
 	isProcessing = true;
 	userInput.disabled = true;
 	sendButton.disabled = true;
 
-	// Add user message to chat
+	// Add user message
 	addMessageToChat("user", message);
 
 	// Clear input
@@ -151,26 +115,26 @@ async function sendMessage() {
 	// Show typing indicator
 	typingIndicator.classList.add("visible");
 
-	// Add message to history
+	// Add to history
 	chatHistory.push({
 		role: "user",
 		content: message,
 	});
 
 	try {
-		// Create new assistant response element
+		// Create assistant message
 		const assistantMessageEl = document.createElement("div");
-		assistantMessageEl.className = "message assistant-message";
+		assistantMessageEl.className =
+			"message assistant-message";
 
 		const assistantTextEl = document.createElement("p");
 
 		assistantMessageEl.appendChild(assistantTextEl);
 		chatMessages.appendChild(assistantMessageEl);
 
-		// Scroll to bottom
 		chatMessages.scrollTop = chatMessages.scrollHeight;
 
-		// Send request to API
+		// Send API request
 		const response = await fetch("/api/chat", {
 			method: "POST",
 			headers: {
@@ -181,7 +145,6 @@ async function sendMessage() {
 			}),
 		});
 
-		// Handle errors
 		if (!response.ok) {
 			throw new Error("Failed to get response");
 		}
@@ -190,7 +153,7 @@ async function sendMessage() {
 			throw new Error("Response body is null");
 		}
 
-		// Process streaming response
+		// Read streaming response
 		const reader = response.body.getReader();
 		const decoder = new TextDecoder();
 
@@ -198,61 +161,40 @@ async function sendMessage() {
 		let buffer = "";
 		let sawDone = false;
 
-		const flushAssistantText = () => {
-			assistantTextEl.innerHTML = markdownToHtml(responseText);
-			chatMessages.scrollTop = chatMessages.scrollHeight;
-		};
+		function updateAssistantMessage() {
+			assistantTextEl.innerHTML =
+				markdownToHtml(responseText);
+
+			chatMessages.scrollTop =
+				chatMessages.scrollHeight;
+		}
 
 		while (true) {
 			const { done, value } = await reader.read();
 
 			if (done) {
-				// Process any remaining complete events in buffer
-				const parsed = consumeSseEvents(buffer + "\n\n");
+				// Process anything remaining in the buffer
+				const parsed = consumeSseEvents(
+					buffer + "\n\n"
+				);
 
 				for (const data of parsed.events) {
 					if (data === "[DONE]") {
 						break;
 					}
 
-					try {
-						const jsonData = JSON.parse(data);
-
-						let content = "";
-
-						// Workers AI format
-						if (
-							typeof jsonData.response === "string" &&
-							jsonData.response.length > 0
-						) {
-							content = jsonData.response;
-						}
-
-						// OpenAI format
-						else if (
-							jsonData.choices?.[0]?.delta?.content
-						) {
-							content =
-								jsonData.choices[0].delta.content;
-						}
-
-						if (content) {
+					processSseData(
+						data,
+						(content) => {
 							responseText += content;
-							flushAssistantText();
+							updateAssistantMessage();
 						}
-					} catch (e) {
-						console.error(
-							"Error parsing SSE data as JSON:",
-							e,
-							data
-						);
-					}
+					);
 				}
 
 				break;
 			}
 
-			// Decode chunk
 			buffer += decoder.decode(value, {
 				stream: true,
 			});
@@ -263,42 +205,16 @@ async function sendMessage() {
 			for (const data of parsed.events) {
 				if (data === "[DONE]") {
 					sawDone = true;
-					buffer = "";
 					break;
 				}
 
-				try {
-					const jsonData = JSON.parse(data);
-
-					let content = "";
-
-					// Workers AI format
-					if (
-						typeof jsonData.response === "string" &&
-						jsonData.response.length > 0
-					) {
-						content = jsonData.response;
-					}
-
-					// OpenAI format
-					else if (
-						jsonData.choices?.[0]?.delta?.content
-					) {
-						content =
-							jsonData.choices[0].delta.content;
-					}
-
-					if (content) {
+				processSseData(
+					data,
+					(content) => {
 						responseText += content;
-						flushAssistantText();
+						updateAssistantMessage();
 					}
-				} catch (e) {
-					console.error(
-						"Error parsing SSE data as JSON:",
-						e,
-						data
-					);
-				}
+				);
 			}
 
 			if (sawDone) {
@@ -306,7 +222,7 @@ async function sendMessage() {
 			}
 		}
 
-		// Add completed response to chat history
+		// Save assistant response
 		if (responseText.length > 0) {
 			chatHistory.push({
 				role: "assistant",
@@ -321,10 +237,8 @@ async function sendMessage() {
 			"Sorry, there was an error processing your request."
 		);
 	} finally {
-		// Hide typing indicator
 		typingIndicator.classList.remove("visible");
 
-		// Re-enable input
 		isProcessing = false;
 		userInput.disabled = false;
 		sendButton.disabled = false;
@@ -334,16 +248,59 @@ async function sendMessage() {
 }
 
 /**
- * Helper function to add message to chat.
+ * Processes one SSE data event.
+ */
+function processSseData(data, onContent) {
+	try {
+		const jsonData = JSON.parse(data);
+
+		let content = "";
+
+		// Cloudflare Workers AI format
+		if (
+			typeof jsonData.response === "string"
+		) {
+			content = jsonData.response;
+		}
+
+		// OpenAI-compatible format
+		else if (
+			jsonData.choices &&
+			jsonData.choices[0] &&
+			jsonData.choices[0].delta &&
+			typeof jsonData.choices[0].delta.content ===
+				"string"
+		) {
+			content =
+				jsonData.choices[0].delta.content;
+		}
+
+		if (content) {
+			onContent(content);
+		}
+	} catch (error) {
+		console.error(
+			"Error parsing SSE data:",
+			error,
+			data
+		);
+	}
+}
+
+/**
+ * Adds a message to the chat.
  */
 function addMessageToChat(role, content) {
 	const messageEl = document.createElement("div");
-	messageEl.className = `message ${role}-message`;
+
+	messageEl.className =
+		"message " + role + "-message";
 
 	const paragraph = document.createElement("p");
 
 	if (role === "assistant") {
-		paragraph.innerHTML = markdownToHtml(content);
+		paragraph.innerHTML =
+			markdownToHtml(content);
 	} else {
 		paragraph.textContent = content;
 	}
@@ -351,27 +308,30 @@ function addMessageToChat(role, content) {
 	messageEl.appendChild(paragraph);
 	chatMessages.appendChild(messageEl);
 
-	// Scroll to bottom
-	chatMessages.scrollTop = chatMessages.scrollHeight;
+	chatMessages.scrollTop =
+		chatMessages.scrollHeight;
 }
 
 /**
  * Processes Server-Sent Events.
  */
 function consumeSseEvents(buffer) {
-	let normalized = buffer.replace(/\r/g, "");
+	const normalized = buffer.replace(/\r/g, "");
 	const events = [];
+
+	let remaining = normalized;
 	let eventEndIndex;
 
 	while (
-		(eventEndIndex = normalized.indexOf("\n\n")) !== -1
+		(eventEndIndex =
+			remaining.indexOf("\n\n")) !== -1
 	) {
-		const rawEvent = normalized.slice(
+		const rawEvent = remaining.slice(
 			0,
 			eventEndIndex
 		);
 
-		normalized = normalized.slice(
+		remaining = remaining.slice(
 			eventEndIndex + 2
 		);
 
@@ -381,19 +341,19 @@ function consumeSseEvents(buffer) {
 		for (const line of lines) {
 			if (line.startsWith("data:")) {
 				dataLines.push(
-					line.slice("data:".length).trimStart()
+					line.slice(5).trimStart()
 				);
 			}
 		}
 
-		if (dataLines.length === 0) continue;
-
-		events.push(dataLines.join("\n"));
+		if (dataLines.length > 0) {
+			events.push(dataLines.join("\n"));
+		}
 	}
 
 	return {
-		events,
-		buffer: normalized,
+		events: events,
+		buffer: remaining,
 	};
 }
 ```
